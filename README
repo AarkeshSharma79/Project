@@ -1,0 +1,286 @@
+# 🌐 Website Auditor
+
+A full-stack web application that audits any website URL and generates a quick SEO and performance report. Users can enter a URL, and the application fetches the webpage, analyzes its content, and displays useful metrics such as HTTP status, response time, page title, meta description, heading count, image accessibility, and approximate word count.
+
+---
+
+## 🚀 Features
+
+- 🔍 Audit any publicly accessible website
+- ⚡ Measure HTTP response time
+- 📄 Extract page title
+- 📝 Extract meta description
+- 📌 Count H1 headings
+- 🖼️ Detect images missing `alt` attributes
+- 📚 Calculate approximate word count
+- ❌ Handles invalid URLs gracefully
+- ⏱️ Handles request timeouts
+- 📄 Detects non-HTML responses
+- 🎨 Clean and responsive React frontend
+- 🔗 REST API built with Express.js
+
+---
+
+## 🛠️ Tech Stack
+
+### Frontend
+- React.js
+- Vite
+- Axios
+- CSS
+
+### Backend
+- Node.js
+- Express.js
+- Axios
+- Cheerio
+- CORS
+
+---
+
+## 📂 Project Structure
+
+```
+website-auditor/
+│
+├── backend/
+│   ├── routes/
+│   │   └── audit.js
+│   ├── server.js
+│   ├── package.json
+│   └── node_modules/
+│
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── App.css
+│   │   └── main.jsx
+│   ├── package.json
+│   └── vite.config.js
+│
+└── README.md
+```
+
+---
+
+## 📦 Installation
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/yourusername/website-auditor.git
+cd website-auditor
+```
+
+---
+
+## Backend Setup
+
+Navigate to the backend folder.
+
+```bash
+cd backend
+```
+
+Install dependencies.
+
+```bash
+npm install
+```
+
+Start the server.
+
+```bash
+npm run dev
+```
+
+The backend runs on
+
+```
+http://localhost:5000
+```
+
+---
+
+## Frontend Setup
+
+Open another terminal.
+
+```bash
+cd frontend
+```
+
+Install dependencies.
+
+```bash
+npm install
+```
+
+Run the development server.
+
+```bash
+npm run dev
+```
+
+The frontend runs on
+
+```
+http://localhost:5173
+```
+
+---
+
+## API Endpoint
+
+### POST
+
+```
+/api/audit
+```
+
+### Request
+
+```json
+{
+  "url": "https://example.com"
+}
+```
+
+---
+
+## Successful Response
+
+```json
+{
+  "success": true,
+  "report": {
+    "httpStatus": 200,
+    "responseTime": "285 ms",
+    "pageTitle": "Example Domain",
+    "metaDescription": "Example website description",
+    "h1Count": 1,
+    "imagesWithoutAlt": 0,
+    "approximateWordCount": 250
+  }
+}
+```
+
+---
+
+## Error Responses
+
+### Invalid URL
+
+```json
+{
+  "success": false,
+  "message": "Invalid URL"
+}
+```
+
+### Missing URL
+
+```json
+{
+  "success": false,
+  "message": "URL is required"
+}
+```
+
+### Timeout
+
+```json
+{
+  "success": false,
+  "message": "Request timed out"
+}
+```
+
+### Non-HTML Response
+
+```json
+{
+  "success": false,
+  "message": "Response is not HTML"
+}
+```
+
+---
+
+## 📊 Audit Metrics
+
+The application reports the following:
+
+| Metric | Description |
+|---------|-------------|
+| HTTP Status | HTTP status code returned by the server |
+| Response Time | Time taken to fetch the webpage |
+| Page Title | HTML `<title>` element |
+| Meta Description | Meta description tag content |
+| H1 Count | Number of `<h1>` elements |
+| Images Missing Alt | Images without an `alt` attribute |
+| Approximate Word Count | Estimated number of words on the page |
+
+---
+
+## ⚠️ Error Handling
+
+The application safely handles:
+
+- Invalid URLs
+- Missing URLs
+- Request timeouts
+- Network failures
+- Non-HTML responses
+- Unreachable websites
+
+The server always returns meaningful JSON responses and avoids crashes.
+
+---
+
+## 📸 Screenshots
+
+Add screenshots of:
+
+- Homepage
+- Audit Report
+- Error Messages
+
+Example:
+
+```
+screenshots/
+    home.png
+    report.png
+    error.png
+```
+
+---
+
+## 🔮 Future Improvements
+
+- Lighthouse integration
+- SEO score calculation
+- Broken link detection
+- Mobile responsiveness audit
+- Open Graph tag analysis
+- Performance visualization
+- PDF report generation
+- Website health score
+- Export report as CSV or PDF
+
+---
+
+## 👨‍💻 Author
+
+**Aarkesh Sharma**
+
+GitHub: https://github.com/AarkeshSharma79
+
+LinkedIn: https://linkedin.com/in/aarkesh-sharma-2536b8372
+
+---
+
+## ⭐ Show Your Support
+
+If you found this project useful, consider giving it a ⭐ on GitHub.
