@@ -1,0 +1,61 @@
+body{
+
+    margin:0;
+
+    font-family:Arial;
+
+    background:#1f1d1d;
+
+}
+
+.container{
+
+    width:700px;
+
+    margin:40px auto;
+
+    text-align:center;
+
+}
+
+input{
+
+    width:70%;
+
+    padding:12px;
+
+    font-size:16px;
+
+}
+
+button{
+
+    padding:12px 20px;
+
+    margin-left:10px;
+
+    cursor:pointer;
+
+}
+
+.card{
+
+    margin-top:30px;
+
+    background:rgb(23, 21, 21);
+
+    padding:20px;
+
+    border-radius:10px;
+
+    box-shadow:0 5px 12px rgba(0,0,0,.15);
+
+    text-align:left;
+
+}
+
+.error{
+
+    color:red;
+
+}
