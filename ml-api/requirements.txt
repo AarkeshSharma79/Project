@@ -1,0 +1,9 @@
+# Core ML
+tensorflow
+tf-keras
+numpy
+
+# API   
+flask
+pillow
+flask-cors
