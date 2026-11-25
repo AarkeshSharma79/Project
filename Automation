@@ -1,0 +1,1031 @@
+{
+  "name": "Employee Birthday & Work Anniversary Wishes",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "eb569442-9356-4829-a163-5ea2755c6fd5",
+      "name": "Every Day at 9 AM IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1aZEHTrystrOlY3dQ5JJfI2Szgn7L3frsObuQtp5a7Cc",
+          "mode": "list",
+          "cachedResultName": "employee_birthday_anniversary_database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aZEHTrystrOlY3dQ5JJfI2Szgn7L3frsObuQtp5a7Cc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Employees",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "be14fc44-edcc-4f3c-99f5-0f6b1e54f376",
+      "name": "Get Employees",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        272,
+        128
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wA39Ff8MaSM7RYN6",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1aZEHTrystrOlY3dQ5JJfI2Szgn7L3frsObuQtp5a7Cc",
+          "mode": "list",
+          "cachedResultName": "employee_birthday_anniversary_database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aZEHTrystrOlY3dQ5JJfI2Szgn7L3frsObuQtp5a7Cc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Notification Log",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "a8f480fc-e847-4c54-a197-bab61c5d93d3",
+      "name": "Get Notification Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        496,
+        160
+      ],
+      "executeOnce": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "wA39Ff8MaSM7RYN6",
+          "name": "Google Sheets account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Finds birthdays and work anniversaries for today (Asia/Kolkata),\n// matching day + month only, and skips anything already logged as sent today.\nconst ZONE = 'Asia/Kolkata';\nconst now = DateTime.now().setZone(ZONE);\nconst todayIso = now.toFormat('yyyy-MM-dd');\n\nfunction mk(y, mo, d) {\n  const dt = DateTime.fromObject({ year: y, month: mo, day: d }, { zone: ZONE });\n  return dt.isValid ? dt : null;\n}\n\n// Accepts YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, Sheets serial numbers, or other parseable text.\nfunction parseDate(value) {\n  if (value === null || value === undefined || value === '') return null;\n  if (typeof value === 'number') {\n    const d = DateTime.fromObject({ year: 1899, month: 12, day: 30 }, { zone: ZONE }).plus({ days: Math.floor(value) });\n    return d.isValid ? d : null;\n  }\n  const s = String(value).trim();\n  let m = s.match(/^([0-9]{4})[-/.]([0-9]{1,2})[-/.]([0-9]{1,2})/);\n  if (m) return mk(Number(m[1]), Number(m[2]), Number(m[3]));\n  m = s.match(/^([0-9]{1,2})[-/.]([0-9]{1,2})[-/.]([0-9]{4})/);\n  if (m) return mk(Number(m[3]), Number(m[2]), Number(m[1]));\n  const js = new Date(s);\n  if (!isNaN(js.getTime())) return mk(js.getFullYear(), js.getMonth() + 1, js.getDate());\n  return null;\n}\n\nfunction matchesToday(d) {\n  if (d.month === now.month && d.day === now.day) return true;\n  // 29 Feb dates are celebrated on 28 Feb in non-leap years\n  return d.month === 2 && d.day === 29 && !now.isInLeapYear && now.month === 2 && now.day === 28;\n}\n\nfunction clean(v) {\n  return v === null || v === undefined ? '' : String(v).trim();\n}\n\n// Build the set of notifications already sent today\nconst alreadySent = new Set();\nfor (const item of $input.all()) {\n  const r = item.json || {};\n  if (r['Employee ID'] === undefined || r['Employee ID'] === '') continue;\n  if (!clean(r['Notification Status']).toLowerCase().startsWith('sent')) continue;\n  const d = parseDate(r['Date']);\n  if (!d || d.toFormat('yyyy-MM-dd') !== todayIso) continue;\n  alreadySent.add(clean(r['Employee ID']) + '|' + clean(r['Occasion']).toLowerCase());\n}\n\nconst out = [];\nfor (const item of $('Get Employees').all()) {\n  const e = item.json || {};\n  const employeeId = clean(e['Employee ID']);\n  const employeeName = clean(e['Employee Name']);\n  if (!employeeId || !employeeName) continue;\n\n  const base = {\n    employeeId,\n    employeeName,\n    firstName: employeeName.split(' ')[0],\n    email: clean(e['Email Address']),\n    phone: clean(e['Phone Number']),\n    department: clean(e['Department']),\n    managerName: clean(e['Manager Name']),\n    managerEmail: clean(e['Manager Email']),\n    date: todayIso,\n  };\n\n  const dob = parseDate(e['Date of Birth']);\n  if (dob && matchesToday(dob)) {\n    const key = employeeId + '|birthday';\n    if (!alreadySent.has(key)) {\n      alreadySent.add(key);\n      out.push({ json: { ...base, occasion: 'Birthday', years: 0 } });\n    }\n  }\n\n  const joined = parseDate(e['Joining Date']);\n  if (joined && matchesToday(joined)) {\n    const years = now.year - joined.year;\n    const key = employeeId + '|work anniversary';\n    if (years >= 1 && !alreadySent.has(key)) {\n      alreadySent.add(key);\n      out.push({ json: { ...base, occasion: 'Work Anniversary', years } });\n    }\n  }\n}\n\n// No matches -> no items -> nothing is sent\nreturn out;"
+      },
+      "id": "86236269-b8b4-4994-8938-8b682c58737b",
+      "name": "Detect Today's Occasions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        128
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.occasion }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Birthday"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Birthday"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.occasion }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "Work Anniversary"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Work Anniversary"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6c02aee9-d29d-4cb9-bab8-a7f045b1fffc",
+      "name": "Route by Occasion",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.5,
+      "position": [
+        800,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write a birthday wish for {{ $json.firstName }} ({{ $json.employeeName }}), who works in the {{ $json.department || \"our\" }} department. Wish them happiness, success and new opportunities for the year ahead.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You write employee greetings for a corporate HR team. Tone: professional, warm, friendly and inclusive. Write 2-3 sentences, under 60 words. Address the employee by first name. Use at most one emoji. Return plain text only: no subject line, no \"Dear ...\" opener, no sign-off, no placeholders, no quotation marks. Make every message unique and avoid clichés."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "cd76ad77-d3fa-4426-9582-bbf239e3cf88",
+      "name": "Write Birthday Wish",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1024,
+        128
+      ],
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5.4-mini",
+          "cachedResultName": "gpt-5.4-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "1b498ef1-3910-4a83-9d26-21f39be4a8b1",
+      "name": "Birthday Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        352
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b1",
+              "name": "employeeId",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.employeeId }}"
+            },
+            {
+              "id": "b2",
+              "name": "employeeName",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.employeeName }}"
+            },
+            {
+              "id": "b3",
+              "name": "email",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.email }}"
+            },
+            {
+              "id": "b4",
+              "name": "managerName",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.managerName }}"
+            },
+            {
+              "id": "b5",
+              "name": "managerEmail",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.managerEmail }}"
+            },
+            {
+              "id": "b6",
+              "name": "occasion",
+              "type": "string",
+              "value": "Birthday"
+            },
+            {
+              "id": "b7",
+              "name": "date",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.date }}"
+            },
+            {
+              "id": "b8",
+              "name": "subject",
+              "type": "string",
+              "value": "=Happy Birthday, {{ $('Route by Occasion').item.json.employeeName }}!"
+            },
+            {
+              "id": "b9",
+              "name": "htmlBody",
+              "type": "string",
+              "value": "=<p>Dear {{ $('Route by Occasion').item.json.firstName }},</p><p>{{ $json.text.trim().split('\\n').filter(l => l.trim()).join('<br>') }}</p><p>Warm regards,<br>HR Team</p>"
+            },
+            {
+              "id": "b10",
+              "name": "managerSubject",
+              "type": "string",
+              "value": "=Team celebration: {{ $('Route by Occasion').item.json.employeeName }}'s birthday today"
+            },
+            {
+              "id": "b11",
+              "name": "managerHtml",
+              "type": "string",
+              "value": "=<p>Dear {{ $('Route by Occasion').item.json.managerName || 'Manager' }},</p><p>Today is the <b>birthday</b> of your team member <b>{{ $('Route by Occasion').item.json.employeeName }}</b> ({{ $('Route by Occasion').item.json.department }}). We have sent them our wishes. You may want to join in and celebrate with the team.</p><p>Warm regards,<br>HR Team</p>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1f2da30c-f0db-402e-af99-4d041437ba1e",
+      "name": "Format Birthday Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1376,
+        240
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "c8e5e112-0626-4e77-b793-b08b333c2f5a",
+      "name": "Collect Wishes",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Write a work anniversary message for {{ $json.firstName }} ({{ $json.employeeName }}) from the {{ $json.department || \"our\" }} department, who completes {{ $json.years }} {{ $json.years === 1 ? \"year\" : \"years\" }} with our organization today. Mention the exact number of years, appreciate their dedication and contributions, and wish them continued success.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You write employee greetings for a corporate HR team. Tone: professional, warm, friendly and inclusive. Write 2-3 sentences, under 60 words. Address the employee by first name. Use at most one emoji. Return plain text only: no subject line, no \"Dear ...\" opener, no sign-off, no placeholders, no quotation marks. Make every message unique and avoid clichés."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "id": "4b3d1f52-c405-4ad0-ae22-a7d776b2e252",
+      "name": "Write Anniversary Wish",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1024,
+        640
+      ],
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5.4-mini",
+          "cachedResultName": "gpt-5.4-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "id": "d8d45829-9885-4ad9-9ce4-05ed1e18b37a",
+      "name": "Anniversary Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1104,
+        864
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "Gateway credits",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "employeeId",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.employeeId }}"
+            },
+            {
+              "id": "a2",
+              "name": "employeeName",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.employeeName }}"
+            },
+            {
+              "id": "a3",
+              "name": "email",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.email }}"
+            },
+            {
+              "id": "a4",
+              "name": "managerName",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.managerName }}"
+            },
+            {
+              "id": "a5",
+              "name": "managerEmail",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.managerEmail }}"
+            },
+            {
+              "id": "a6",
+              "name": "occasion",
+              "type": "string",
+              "value": "Work Anniversary"
+            },
+            {
+              "id": "a7",
+              "name": "date",
+              "type": "string",
+              "value": "={{ $('Route by Occasion').item.json.date }}"
+            },
+            {
+              "id": "a8",
+              "name": "subject",
+              "type": "string",
+              "value": "=Congratulations on {{ $('Route by Occasion').item.json.years }} {{ $('Route by Occasion').item.json.years === 1 ? 'Year' : 'Years' }} with Us, {{ $('Route by Occasion').item.json.employeeName }}!"
+            },
+            {
+              "id": "a9",
+              "name": "htmlBody",
+              "type": "string",
+              "value": "=<p>Dear {{ $('Route by Occasion').item.json.firstName }},</p><p>{{ $json.text.trim().split('\\n').filter(l => l.trim()).join('<br>') }}</p><p>Warm regards,<br>HR Team</p>"
+            },
+            {
+              "id": "a10",
+              "name": "managerSubject",
+              "type": "string",
+              "value": "=Team milestone: {{ $('Route by Occasion').item.json.employeeName }} completes {{ $('Route by Occasion').item.json.years }} {{ $('Route by Occasion').item.json.years === 1 ? 'year' : 'years' }} today"
+            },
+            {
+              "id": "a11",
+              "name": "managerHtml",
+              "type": "string",
+              "value": "=<p>Dear {{ $('Route by Occasion').item.json.managerName || 'Manager' }},</p><p>Your team member <b>{{ $('Route by Occasion').item.json.employeeName }}</b> ({{ $('Route by Occasion').item.json.department }}) celebrates a <b>work anniversary</b> today, completing <b>{{ $('Route by Occasion').item.json.years }} {{ $('Route by Occasion').item.json.years === 1 ? 'year' : 'years' }}</b> with our organization. We have sent them our congratulations. You may want to recognise this milestone with the team.</p><p>Warm regards,<br>HR Team</p>"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b61bbb87-d152-4c56-9f15-9a9a3ddfcd58",
+      "name": "Format Anniversary Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1376,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.htmlBody }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "78733f05-7608-43f6-80d3-ce0cb2f48911",
+      "name": "Send Employee Wish",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1328,
+        304
+      ],
+      "webhookId": "73cccf86-e7c7-4d8d-a887-376b94a8fb7f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "XWJpZqKQTJ710tTt",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Collect Wishes').item.json.managerEmail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "70faf09f-30fc-4337-aee2-02b7a44b019f",
+      "name": "Has Manager Email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1552,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Collect Wishes').item.json.managerEmail }}",
+        "subject": "={{ $('Collect Wishes').item.json.managerSubject }}",
+        "message": "={{ $('Collect Wishes').item.json.managerHtml }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "aaeb003f-0335-44f7-b82e-d5501767e2e9",
+      "name": "Notify Manager",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1776,
+        128
+      ],
+      "webhookId": "58d00451-85db-4f13-b0e6-91631f1eb087",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "XWJpZqKQTJ710tTt",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "Employee ID",
+              "type": "string",
+              "value": "={{ $('Collect Wishes').item.json.employeeId }}"
+            },
+            {
+              "id": "s2",
+              "name": "Employee Name",
+              "type": "string",
+              "value": "={{ $('Collect Wishes').item.json.employeeName }}"
+            },
+            {
+              "id": "s3",
+              "name": "Occasion",
+              "type": "string",
+              "value": "={{ $('Collect Wishes').item.json.occasion }}"
+            },
+            {
+              "id": "s4",
+              "name": "Date",
+              "type": "string",
+              "value": "={{ $('Collect Wishes').item.json.date }}"
+            },
+            {
+              "id": "s5",
+              "name": "Notification Status",
+              "type": "string",
+              "value": "={{ $json.error ? 'Sent - Manager Notification Failed' : 'Sent' }}"
+            },
+            {
+              "id": "s6",
+              "name": "Details",
+              "type": "string",
+              "value": "={{ $json.error ? 'Manager email failed: ' + ($json.error.message || $json.error) : ($('Collect Wishes').item.json.managerEmail ? 'Employee and manager notified' : 'Employee notified; no manager email on file') }}"
+            },
+            {
+              "id": "s7",
+              "name": "Logged At",
+              "type": "string",
+              "value": "={{ $now.setZone('Asia/Kolkata').toFormat('yyyy-MM-dd HH:mm:ss') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7fd73702-c3c4-4ce9-a10c-354dcd3e76d4",
+      "name": "Build Sent Log Entry",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2000,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1aZEHTrystrOlY3dQ5JJfI2Szgn7L3frsObuQtp5a7Cc",
+          "mode": "list",
+          "cachedResultName": "employee_birthday_anniversary_database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aZEHTrystrOlY3dQ5JJfI2Szgn7L3frsObuQtp5a7Cc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Notification Log",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Employee ID",
+              "displayName": "Employee ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Employee Name",
+              "displayName": "Employee Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Occasion",
+              "displayName": "Occasion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Notification Date",
+              "displayName": "Notification Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Notification Status",
+              "displayName": "Notification Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Details",
+              "displayName": "Details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Logged At",
+              "displayName": "Logged At",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2cd6040b-3846-4e9d-9397-14986f49132f",
+      "name": "Update Notification Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2224,
+        304
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "aRtVIwKbmWTvMuST",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "Employee ID",
+              "type": "string",
+              "value": "={{ $('Collect Wishes').item.json.employeeId }}"
+            },
+            {
+              "id": "f2",
+              "name": "Employee Name",
+              "type": "string",
+              "value": "={{ $('Collect Wishes').item.json.employeeName }}"
+            },
+            {
+              "id": "f3",
+              "name": "Occasion",
+              "type": "string",
+              "value": "={{ $('Collect Wishes').item.json.occasion }}"
+            },
+            {
+              "id": "f4",
+              "name": "Date",
+              "type": "string",
+              "value": "={{ $('Collect Wishes').item.json.date }}"
+            },
+            {
+              "id": "f5",
+              "name": "Notification Status",
+              "type": "string",
+              "value": "Failed"
+            },
+            {
+              "id": "f6",
+              "name": "Details",
+              "type": "string",
+              "value": "=Employee email failed: {{ ($json.error && $json.error.message) || $json.error || 'Unknown error' }}"
+            },
+            {
+              "id": "f7",
+              "name": "Logged At",
+              "type": "string",
+              "value": "={{ $now.setZone('Asia/Kolkata').toFormat('yyyy-MM-dd HH:mm:ss') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8448fe0c-aa9b-4478-845c-67fc350b8ce5",
+      "name": "Build Failed Log Entry",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        2000,
+        416
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Day at 9 AM IST": {
+      "main": [
+        [
+          {
+            "node": "Get Employees",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Employees": {
+      "main": [
+        [
+          {
+            "node": "Get Notification Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Notification Log": {
+      "main": [
+        [
+          {
+            "node": "Detect Today's Occasions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Today's Occasions": {
+      "main": [
+        [
+          {
+            "node": "Route by Occasion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Occasion": {
+      "main": [
+        [
+          {
+            "node": "Write Birthday Wish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write Anniversary Wish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Birthday Wish": {
+      "main": [
+        [
+          {
+            "node": "Format Birthday Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Birthday Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write Birthday Wish",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Birthday Email": {
+      "main": [
+        [
+          {
+            "node": "Collect Wishes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Wishes": {
+      "main": [
+        [
+          {
+            "node": "Send Employee Wish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Anniversary Wish": {
+      "main": [
+        [
+          {
+            "node": "Format Anniversary Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anniversary Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write Anniversary Wish",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Anniversary Email": {
+      "main": [
+        [
+          {
+            "node": "Collect Wishes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Employee Wish": {
+      "main": [
+        [
+          {
+            "node": "Has Manager Email?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Failed Log Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Manager Email?": {
+      "main": [
+        [
+          {
+            "node": "Notify Manager",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Sent Log Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Manager": {
+      "main": [
+        [
+          {
+            "node": "Build Sent Log Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Sent Log Entry": {
+      "main": [
+        [
+          {
+            "node": "Update Notification Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Failed Log Entry": {
+      "main": [
+        [
+          {
+            "node": "Update Notification Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "Asia/Kolkata"
+  },
+  "versionId": "3ad672ed-5c0e-48ba-8a02-a27665bf1f51",
+  "meta": {
+    "instanceId": "c203275132fd1c553f63adb590afb07a66aa99a20dfac9b3ffc4eaa1791a3013"
+  },
+  "nodeGroups": [
+    {
+      "id": "23487bbb-5de9-4d2b-9a35-dfc43241c1ab",
+      "name": "Find today's celebrations",
+      "nodeIds": [
+        "be14fc44-edcc-4f3c-99f5-0f6b1e54f376",
+        "a8f480fc-e847-4c54-a197-bab61c5d93d3",
+        "86236269-b8b4-4994-8938-8b682c58737b"
+      ],
+      "description": "Reads all employees daily, matches birthdays and joining dates to today, and skips anyone already greeted today"
+    },
+    {
+      "id": "387d5745-bd33-4e82-969d-111a582cdf59",
+      "name": "Write personal wishes",
+      "nodeIds": [
+        "6c02aee9-d29d-4cb9-bab8-a7f045b1fffc",
+        "1b498ef1-3910-4a83-9d26-21f39be4a8b1",
+        "d8d45829-9885-4ad9-9ce4-05ed1e18b37a",
+        "cd76ad77-d3fa-4426-9582-bbf239e3cf88",
+        "4b3d1f52-c405-4ad0-ae22-a7d776b2e252",
+        "1f2da30c-f0db-402e-af99-4d041437ba1e",
+        "b61bbb87-d152-4c56-9f15-9a9a3ddfcd58",
+        "c8e5e112-0626-4e77-b793-b08b333c2f5a"
+      ],
+      "description": "Birthdays and anniversaries each get a unique AI-written message, wrapped into employee and manager emails"
+    },
+    {
+      "id": "7ac6052d-0e7f-4b28-b190-9a799ae5bc3b",
+      "name": "Deliver and record greetings",
+      "nodeIds": [
+        "78733f05-7608-43f6-80d3-ce0cb2f48911",
+        "70faf09f-30fc-4337-aee2-02b7a44b019f",
+        "aaeb003f-0335-44f7-b82e-d5501767e2e9",
+        "7fd73702-c3c4-4ce9-a10c-354dcd3e76d4",
+        "8448fe0c-aa9b-4478-845c-67fc350b8ce5",
+        "2cd6040b-3846-4e9d-9397-14986f49132f"
+      ],
+      "description": "Emails the employee, alerts their manager, and logs each result, including failures, without stopping other employees"
+    }
+  ],
+  "id": "TVvM0njfIU6uzxy2",
+  "tags": []
+}
